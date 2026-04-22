@@ -87,8 +87,9 @@ function renderUserIncomesList() {
     const list = $("user-incomes-list");
     if (!list || !window.loggedInUser) return;
     let html = "";
+    const loggedUser = window.loggedInUser.trim();
     (appData.userIncomes || []).forEach((inc, i) => {
-        if (inc.user === window.loggedInUser) {
+        if ((inc.user || "").trim() === loggedUser) {
             html += `
                 <li style="justify-content: space-between; flex-wrap: wrap;">
                     <span>الرحلة: ${inc.tripName || "-"} | المبلغ: ${inc.amount} ${inc.currency} | النوع: ${inc.type} | التاريخ: ${(inc.date || "").split("T")[0] || ""}</span>
@@ -188,19 +189,18 @@ function populateSelects() {
     const tripOptions = relatedTrips.map(t => `<option value="${t.name}">${t.name}</option>`).join("");
 
     const busHtml = (appData.buses || []).map(n => `<option value="${n}">${n}</option>`).join("");
-    $("user-car-type-select").innerHTML = `<option value="">اختر السيارة</option>${busHtml}`;
-    $("user-bus-car-select").innerHTML = `<option value="">اختر السيارة</option>${busHtml}`;
+    if($("user-car-type-select")) $("user-car-type-select").innerHTML = `<option value="">اختر السيارة</option>${busHtml}`;
+    if($("user-bus-car-select")) $("user-bus-car-select").innerHTML = `<option value="">اختر السيارة</option>${busHtml}`;
 
     const driverHtml = (appData.drivers || []).map(n => `<option value="${n}">${n}</option>`).join("");
-    $("user-bus-driver-select").innerHTML = `<option value="">اختر السائق</option>${driverHtml}`;
+    if($("user-bus-driver-select")) $("user-bus-driver-select").innerHTML = `<option value="">اختر السائق</option>${driverHtml}`;
 
-    $("user-expense-type-select").innerHTML = `<option value="">اختر النوع</option>` + (appData.expenseTypes || []).map(n => `<option>${n}</option>`).join("");
-    $("user-bus-opts-select").innerHTML = `<option value="">بدون خيار</option>` + (appData.busExpenseOptions || []).map(n => `<option>${n}</option>`).join("");
+    if($("user-expense-type-select")) $("user-expense-type-select").innerHTML = `<option value="">اختر النوع</option>` + (appData.expenseTypes || []).map(n => `<option>${n}</option>`).join("");
+    if($("user-bus-opts-select")) $("user-bus-opts-select").innerHTML = `<option value="">بدون خيار</option>` + (appData.busExpenseOptions || []).map(n => `<option>${n}</option>`).join("");
 
-    $("user-expense-trip-name").innerHTML = `<option value="">اختر الرحلة</option>${tripOptions}`;
-    $("user-income-trip-name").innerHTML = `<option value="">اختر الرحلة</option>${tripOptions}`;
-    $("user-bus-exp-trip-name").innerHTML = `<option value="">اختر الرحلة</option>${tripOptions}`;
-    $("user-return-trip-name").innerHTML = `<option value="">اختر الرحلة</option>${tripOptions}`;
+    if($("user-expense-trip-name")) $("user-expense-trip-name").innerHTML = `<option value="">اختر الرحلة</option>${tripOptions}`;
+    if($("user-income-trip-name")) $("user-income-trip-name").innerHTML = `<option value="">اختر الرحلة</option>${tripOptions}`;
+    if($("user-bus-exp-trip-name")) $("user-bus-exp-trip-name").innerHTML = `<option value="">اختر الرحلة</option>${tripOptions}`;
 }
 
 function getCurrentFinanceForUser() {
@@ -217,7 +217,7 @@ function updateAdvanceDisplay() {
     if(!container) return;
     const latestFinance = getCurrentFinanceForUser();
     if (latestFinance) {
-        const isDriver = latestFinance.driverName === window.loggedInUser;
+        const isDriver = (latestFinance.driverName || "").trim() === window.loggedInUser.trim();
         const prefix = isDriver ? "driver" : "mandoub";
         const origIQD = latestFinance[`original${prefix}LoanIQD`] !== undefined ? latestFinance[`original${prefix}LoanIQD`] : (Number(latestFinance[`${prefix}LoanIQD`])||0);
         const origUSD = latestFinance[`original${prefix}LoanUSD`] !== undefined ? latestFinance[`original${prefix}LoanUSD`] : (Number(latestFinance[`${prefix}LoanUSD`])||0);
@@ -250,7 +250,8 @@ function updateAdvanceDisplay() {
 function renderTasksList() {
     const list = $("user-tasks-list");
     if (!list || !window.loggedInUser) return;
-    const userTasks = (appData.tasks || []).filter(t => t.personName === window.loggedInUser);
+    const loggedUser = window.loggedInUser.trim();
+    const userTasks = (appData.tasks || []).filter(t => (t.personName || "").trim() === loggedUser);
     list.innerHTML = userTasks.map((t, i) => `
         <li style="justify-content: space-between; flex-wrap: wrap;">
             <span>${t.tripName || "-"} | ${t.task || "-"} | ${t.status || "-"}</span>
@@ -262,7 +263,8 @@ function renderTasksList() {
 }
 
 window.updateMyTaskStatus = (taskId) => {
-    const task = (appData.tasks || []).find(t => (t.createdAt || "") === taskId && t.personName === window.loggedInUser);
+    const loggedUser = window.loggedInUser.trim();
+    const task = (appData.tasks || []).find(t => (t.createdAt || "") === taskId && (t.personName || "").trim() === loggedUser);
     if (!task) return;
     const status = prompt("أدخل الحالة الجديدة", task.status || "قيد التنفيذ");
     if (status) {
@@ -278,8 +280,9 @@ function renderUserExpensesList() {
     const list = $("user-expenses-list");
     if (!list || !window.loggedInUser) return;
     let html = "";
+    const loggedUser = window.loggedInUser.trim();
     (appData.userExpenses || []).forEach((exp, i) => {
-        if (exp.user === window.loggedInUser) {
+        if ((exp.user || "").trim() === loggedUser) {
             html += `
                 <li style="justify-content: space-between; flex-wrap: wrap;">
                     <span>الرحلة: ${exp.tripName || "-"} | المبلغ: ${exp.amount} ${exp.currency} | النوع: ${exp.type} | التاريخ: ${(exp.date || "").split("T")[0] || ""}</span>
