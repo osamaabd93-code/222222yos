@@ -1,3 +1,4 @@
+// /user_repo/script.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
 import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
 
@@ -79,7 +80,23 @@ function refreshAllUI() {
     populateSelects();
     updateUserDashboard();
     renderUserExpensesList();
+    renderUserIncomesList();
     renderTasksList();
+}
+
+function renderUserIncomesList() {
+    const list = $("user-incomes-list");
+    if (!list || !window.loggedInUser) return;
+    let html = "";
+    (appData.userIncomes || []).forEach((inc, i) => {
+        if (inc.user === window.loggedInUser) {
+            html += `
+                <li style="justify-content: space-between; flex-wrap: wrap;">
+                    <span>الرحلة: ${inc.tripName || "-"} | المبلغ: ${inc.amount} ${inc.currency} | النوع: ${inc.type} | التاريخ: ${(inc.date || "").split("T")[0] || ""}</span>
+                </li>`;
+        }
+    });
+    list.innerHTML = html || '<li>لا توجد إيرادات مسجلة</li>';
 }
 
 function populateUserSelectsForLogin() {
@@ -194,23 +211,39 @@ function getCurrentFinanceForUser() {
 
 function updateAdvanceDisplay() {
     if (!window.loggedInUser) return;
-    let iqd = 0, usd = 0, sar = 0;
+    if($("expenses-driver-name")) $("expenses-driver-name").textContent = window.loggedInUser;
+    const container = $("expenses-loans-container");
+    if(!container) return;
     const latestFinance = getCurrentFinanceForUser();
     if (latestFinance) {
-        if (latestFinance.driverName === window.loggedInUser) {
-            iqd = Number(latestFinance.driverLoanIQD) || 0;
-            usd = Number(latestFinance.driverLoanUSD) || 0;
-            sar = Number(latestFinance.driverLoanSAR) || 0;
-        } else if (latestFinance.mandoubName === window.loggedInUser) {
-            iqd = Number(latestFinance.mandoubLoanIQD) || 0;
-            usd = Number(latestFinance.mandoubLoanUSD) || 0;
-            sar = Number(latestFinance.mandoubLoanSAR) || 0;
-        }
+        const isDriver = latestFinance.driverName === window.loggedInUser;
+        const prefix = isDriver ? "driver" : "mandoub";
+        const origIQD = latestFinance[`original${prefix}LoanIQD`] !== undefined ? latestFinance[`original${prefix}LoanIQD`] : (Number(latestFinance[`${prefix}LoanIQD`])||0);
+        const origUSD = latestFinance[`original${prefix}LoanUSD`] !== undefined ? latestFinance[`original${prefix}LoanUSD`] : (Number(latestFinance[`${prefix}LoanUSD`])||0);
+        const origSAR = latestFinance[`original${prefix}LoanSAR`] !== undefined ? latestFinance[`original${prefix}LoanSAR`] : (Number(latestFinance[`${prefix}LoanSAR`])||0);
+        const origAdv = latestFinance[`original${prefix}Advance`] !== undefined ? latestFinance[`original${prefix}Advance`] : (Number(latestFinance[`${prefix}Advance`])||0);
+        const finCurrency = latestFinance.currency || "دينار";
+        let totalIqd = origIQD + (finCurrency === "دينار" ? origAdv : 0);
+        let totalUsd = origUSD + (finCurrency === "دولار" ? origAdv : 0);
+        let totalSar = origSAR + (finCurrency === "ريال" ? origAdv : 0);
+        let expIqd = latestFinance[`expIqd${prefix}`] || 0;
+        let expUsd = latestFinance[`expUsd${prefix}`] || 0;
+        let expSar = latestFinance[`expSar${prefix}`] || 0;
+        const curIQD = Number(latestFinance[`${prefix}LoanIQD`]) || 0;
+        const curUSD = Number(latestFinance[`${prefix}LoanUSD`]) || 0;
+        const curSAR = Number(latestFinance[`${prefix}LoanSAR`]) || 0;
+        const curAdv = Number(latestFinance[`${prefix}Advance`]) || 0;
+        let remIqd = curIQD + (finCurrency === "دينار" ? curAdv : 0);
+        let remUsd = curUSD + (finCurrency === "دولار" ? curAdv : 0);
+        let remSar = curSAR + (finCurrency === "ريال" ? curAdv : 0);
+        container.innerHTML = `
+            <p style="margin-bottom: 5px; color:#fff;"><strong>دينار:</strong> إجمالي السلفة: ${totalIqd} | المصروف: <span style="color:#fca5a5;">${expIqd}</span> | المتبقي: <span style="color:#6ee7b7;font-weight:bold;">${remIqd}</span></p>
+            <p style="margin-bottom: 5px; color:#fff;"><strong>دولار:</strong> إجمالي السلفة: ${totalUsd} | المصروف: <span style="color:#fca5a5;">${expUsd}</span> | المتبقي: <span style="color:#6ee7b7;font-weight:bold;">${remUsd}</span></p>
+            <p style="color:#fff;"><strong>ريال:</strong> إجمالي السلفة: ${totalSar} | المصروف: <span style="color:#fca5a5;">${expSar}</span> | المتبقي: <span style="color:#6ee7b7;font-weight:bold;">${remSar}</span></p>
+        `;
+    } else {
+        container.innerHTML = "<p>لا توجد سلف مسجلة حالياً.</p>";
     }
-    if($("expenses-driver-name")) $("expenses-driver-name").textContent = window.loggedInUser;
-    if($("expenses-loan-iqd")) $("expenses-loan-iqd").textContent = iqd;
-    if($("expenses-loan-usd")) $("expenses-loan-usd").textContent = usd;
-    if($("expenses-loan-sar")) $("expenses-loan-sar").textContent = sar;
 }
 
 function renderTasksList() {
@@ -263,14 +296,31 @@ window.deleteUserExpense = (i) => {
         if (latestFinance) {
             const amt = Number(exp.amount) || 0;
             const cur = exp.currency || "دينار";
-            if (latestFinance.driverName === window.loggedInUser) {
-                if (cur === "دينار") latestFinance.driverLoanIQD = (Number(latestFinance.driverLoanIQD) || 0) + amt;
-                else if (cur === "دولار") latestFinance.driverLoanUSD = (Number(latestFinance.driverLoanUSD) || 0) + amt;
-                else if (cur === "ريال") latestFinance.driverLoanSAR = (Number(latestFinance.driverLoanSAR) || 0) + amt;
-            } else if (latestFinance.mandoubName === window.loggedInUser) {
-                if (cur === "دينار") latestFinance.mandoubLoanIQD = (Number(latestFinance.mandoubLoanIQD) || 0) + amt;
-                else if (cur === "دولار") latestFinance.mandoubLoanUSD = (Number(latestFinance.mandoubLoanUSD) || 0) + amt;
-                else if (cur === "ريال") latestFinance.mandoubLoanSAR = (Number(latestFinance.mandoubLoanSAR) || 0) + amt;
+            let rRef = amt;
+            const isDriver = latestFinance.driverName === window.loggedInUser;
+            const isMandoub = latestFinance.mandoubName === window.loggedInUser;
+            if (isDriver || isMandoub) {
+                const prefix = isDriver ? "driver" : "mandoub";
+                let accField = `exp` + (cur === "دينار" ? "Iqd" : cur === "دولار" ? "Usd" : "Sar") + prefix;
+                if (latestFinance[accField] !== undefined) latestFinance[accField] = Math.max(0, latestFinance[accField] - amt);
+
+                let field = `${prefix}Loan` + (cur === "دينار" ? "IQD" : cur === "دولار" ? "USD" : "SAR");
+                let origField = `original${prefix}Loan` + (cur === "دينار" ? "IQD" : cur === "دولار" ? "USD" : "SAR");
+                let currentLoan = Number(latestFinance[field]) || 0;
+                let originalLoan = latestFinance[origField] !== undefined ? latestFinance[origField] : ((Number(latestFinance[field]) || 0) + rRef);
+                if (currentLoan + rRef <= originalLoan) {
+                    latestFinance[field] = currentLoan + rRef;
+                    rRef = 0;
+                } else {
+                    rRef -= (originalLoan - currentLoan);
+                    latestFinance[field] = originalLoan;
+                }
+
+                if (rRef > 0 && latestFinance.currency === cur) {
+                     let advField = `${prefix}Advance`;
+                     let currentAdv = Number(latestFinance[advField]) || 0;
+                     latestFinance[advField] = currentAdv + rRef;
+                }
             }
         }
         appData.userExpenses.splice(i, 1);
@@ -304,14 +354,39 @@ function setupSaveButtons() {
 
         const latestFinance = getCurrentFinanceForUser();
         if (latestFinance) {
-            if (latestFinance.driverName === window.loggedInUser) {
-                if (expCurrency === "دينار") latestFinance.driverLoanIQD = (Number(latestFinance.driverLoanIQD) || 0) - expAmount;
-                else if (expCurrency === "دولار") latestFinance.driverLoanUSD = (Number(latestFinance.driverLoanUSD) || 0) - expAmount;
-                else if (expCurrency === "ريال") latestFinance.driverLoanSAR = (Number(latestFinance.driverLoanSAR) || 0) - expAmount;
-            } else if (latestFinance.mandoubName === window.loggedInUser) {
-                if (expCurrency === "دينار") latestFinance.mandoubLoanIQD = (Number(latestFinance.mandoubLoanIQD) || 0) - expAmount;
-                else if (expCurrency === "دولار") latestFinance.mandoubLoanUSD = (Number(latestFinance.mandoubLoanUSD) || 0) - expAmount;
-                else if (expCurrency === "ريال") latestFinance.mandoubLoanSAR = (Number(latestFinance.mandoubLoanSAR) || 0) - expAmount;
+            let rExp = expAmount;
+            const isDriver = latestFinance.driverName === window.loggedInUser;
+            const isMandoub = latestFinance.mandoubName === window.loggedInUser;
+            if (isDriver || isMandoub) {
+                const prefix = isDriver ? "driver" : "mandoub";
+                
+                if (latestFinance[`original${prefix}Advance`] === undefined) latestFinance[`original${prefix}Advance`] = Number(latestFinance[`${prefix}Advance`]) || 0;
+                if (latestFinance[`original${prefix}LoanIQD`] === undefined) latestFinance[`original${prefix}LoanIQD`] = Number(latestFinance[`${prefix}LoanIQD`]) || 0;
+                if (latestFinance[`original${prefix}LoanUSD`] === undefined) latestFinance[`original${prefix}LoanUSD`] = Number(latestFinance[`${prefix}LoanUSD`]) || 0;
+                if (latestFinance[`original${prefix}LoanSAR`] === undefined) latestFinance[`original${prefix}LoanSAR`] = Number(latestFinance[`${prefix}LoanSAR`]) || 0;
+                
+                if (latestFinance[`expIqd${prefix}`] === undefined) latestFinance[`expIqd${prefix}`] = 0;
+                if (latestFinance[`expUsd${prefix}`] === undefined) latestFinance[`expUsd${prefix}`] = 0;
+                if (latestFinance[`expSar${prefix}`] === undefined) latestFinance[`expSar${prefix}`] = 0;
+
+                if (latestFinance.currency === expCurrency && Number(latestFinance[`${prefix}Advance`]) > 0) {
+                    let adv = Number(latestFinance[`${prefix}Advance`]);
+                    if (adv >= rExp) {
+                        latestFinance[`${prefix}Advance`] = adv - rExp;
+                        rExp = 0;
+                    } else {
+                        rExp -= adv;
+                        latestFinance[`${prefix}Advance`] = 0;
+                    }
+                }
+
+                if (rExp > 0) {
+                    let field = `${prefix}Loan` + (expCurrency === "دينار" ? "IQD" : expCurrency === "دولار" ? "USD" : "SAR");
+                    latestFinance[field] = (Number(latestFinance[field]) || 0) - rExp;
+                }
+
+                let accField = `exp` + (expCurrency === "دينار" ? "Iqd" : expCurrency === "دولار" ? "Usd" : "Sar") + prefix;
+                latestFinance[accField] += expAmount;
             }
         }
 
@@ -357,26 +432,6 @@ function setupSaveButtons() {
         $("user-bus-exp-file-base64").value = "";
         saveToDB();
         showCustomAlert("تم حفظ مصاريف الباص بنجاح");
-    });
-
-    $("btn-save-user-return").addEventListener("click", () => {
-        const userRole = (appData.drivers || []).includes(window.loggedInUser) ? "driver" : "mandoub";
-        const record = {
-            tripName: $("user-return-trip-name").value,
-            currency: $("user-return-currency").value,
-            userName: window.loggedInUser,
-            userRole,
-            bonus: $("user-return-bonus").value,
-            discount: $("user-return-discount").value,
-            netKm: $("user-return-net-km").value,
-            date: new Date().toISOString()
-        };
-        if (!appData.returnInfos) appData.returnInfos = [];
-        appData.returnInfos.push(record);
-        $("user-return-form").reset();
-        saveToDB();
-        refreshAllUI();
-        showCustomAlert("تم حفظ معلومات بعد العودة");
     });
 }
 
@@ -465,7 +520,20 @@ function updateUserDashboard() {
             <p><strong>السبب:</strong> ${latestFinance.mandoubEvalReason || "-"}</p>`;
     }
 
-    $("user-current-trip-info").innerHTML = currentTripHtml + (financialHtml ? '<hr style="margin: 15px 0; border-color: rgba(255,255,255,0.2);">' + financialHtml : "");
+    let returnHtml = "";
+    if (currentTrip) {
+        const currentTripReturn = (appData.returnInfos || []).find(r => r.tripName === currentTrip.name);
+        if (currentTripReturn) {
+            const isDriver = (appData.drivers || []).includes(window.loggedInUser);
+            let bns = isDriver ? currentTripReturn.driverBonus : currentTripReturn.mandoubBonus;
+            let dsc = isDriver ? currentTripReturn.driverDiscount : currentTripReturn.mandoubDiscount;
+            returnHtml = `<h4 style="margin-top: 15px; margin-bottom: 10px; color: #93c5fd;">مكافآت وخصومات بعد العودة (من الإدارة):</h4>
+                          <p><strong>الحوافز المضافة:</strong> <span style="color:#6ee7b7;">${bns || 0}</span></p>
+                          <p><strong>الخصومات المطبقة:</strong> <span style="color:#fca5a5;">${dsc || 0}</span></p>`;
+        }
+    }
+
+    $("user-current-trip-info").innerHTML = currentTripHtml + (financialHtml ? '<hr style="margin: 15px 0; border-color: rgba(255,255,255,0.2);">' + financialHtml : "") + (returnHtml ? '<hr style="margin: 15px 0; border-color: rgba(255,255,255,0.2);">' + returnHtml : "");
 }
 
 function autoUser(){
