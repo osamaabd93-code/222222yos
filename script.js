@@ -451,22 +451,21 @@ function updateUserDashboard() {
     const totalDays = trips.reduce((sum, t) => sum + (Number(t.days) || 0), 0);
 
     const myReturnRows = (appData.returnInfos || []).filter(r =>
-        (r.userName || "").trim() === loggedUser ||
-        (trips.some(t => t.name === r.tripName) && (
-            (r.userRole === "driver" && ((appData.drivers || []).map(d=>d.trim()).includes(loggedUser))) ||
-            (r.userRole === "mandoub" && ((appData.mandoubs || []).map(m=>m.trim()).includes(loggedUser)))
-        ))
+        trips.some(t => t.name === r.tripName)
     );
 
     let totalBonus = 0, totalDiscount = 0;
     myReturnRows.forEach(r => {
-        if ((r.userName || "").trim() === loggedUser) {
-            totalBonus += Number(r.bonus) || 0;
-            totalDiscount += Number(r.discount) || 0;
-        } else {
-            const isDriver = (appData.drivers || []).map(d=>d.trim()).includes(loggedUser);
-            totalBonus += Number(isDriver ? r.driverBonus : r.mandoubBonus) || 0;
-            totalDiscount += Number(isDriver ? r.driverDiscount : r.mandoubDiscount) || 0;
+        const relatedTrip = trips.find(t => t.name === r.tripName);
+        if (relatedTrip) {
+            const isDriver = (relatedTrip.driver || "").trim() === loggedUser || (relatedTrip.driver2 || "").trim() === loggedUser;
+            if (isDriver) {
+                totalBonus += Number(r.driverBonus) || 0;
+                totalDiscount += Number(r.driverDiscount) || 0;
+            } else {
+                totalBonus += Number(r.mandoubBonus) || 0;
+                totalDiscount += Number(r.mandoubDiscount) || 0;
+            }
         }
     });
 
